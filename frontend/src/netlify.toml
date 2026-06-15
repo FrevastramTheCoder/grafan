@@ -1,0 +1,10 @@
+[dev]
+  port = 8888
+  targetPort = 8888
+
+[build]
+  command = "npm run build"
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"

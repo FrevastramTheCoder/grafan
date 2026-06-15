@@ -1,6 +1,9 @@
-node_modules/ 
-venv/ 
-__pycache__/ 
-*.db 
-.env 
-uploads/ 
+node_modules/
+.env
+.DS_Store
+backend/venv/
+backend/uploads/
+*.pyc
+__pycache__/
+.netlify/
+build/

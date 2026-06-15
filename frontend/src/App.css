@@ -644,3 +644,40 @@ header {
 html {
   scroll-behavior: smooth;
 }
+
+/* New styles for AI features */
+.chat-container {
+  background: #f9f9f9;
+  border-radius: 12px;
+  padding: 15px;
+}
+
+.chat-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.chat-container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.chat-container::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.btn-ai {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+}
+
+.btn-ai:hover {
+  background: linear-gradient(135deg, #5a67d8 0%, #6b46a0 100%);
+  transform: translateY(-1px);
+}
+
+.modal-content.large {
+  max-width: 600px;
+  width: 90%;
+}
