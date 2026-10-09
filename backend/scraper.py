@@ -1,4 +1,5 @@
 import requests
+import cloudscraper
 from bs4 import BeautifulSoup
 import re
 import time
@@ -23,7 +24,15 @@ CONFIGURED_SOURCES = (
 
 class JobScraper:
     def __init__(self, debug=False):
-        self.session = requests.Session()
+        # ✅ Cloudscraper inashinda Cloudflare
+        self.session = cloudscraper.create_scraper(
+            browser={
+                'browser': 'chrome',
+                'platform': 'windows',
+                'desktop': True
+            },
+            delay=10
+        )
         self.debug = debug
         self.last_errors = []
         self.user_agents = [
@@ -52,6 +61,7 @@ class JobScraper:
         print("🤖 GRAFAN JOB SCRAPER READY (Keyword-based)")
         print(f"   Sources: {len(CONFIGURED_SOURCES)}")
         print("   Using smart keyword matching for job detection")
+        print("   Cloudscraper: ENABLED")
 
     def log(self, message):
         if self.debug:
