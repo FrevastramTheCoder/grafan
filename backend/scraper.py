@@ -10,13 +10,16 @@ import ipaddress
 import socket
 from urllib.parse import urljoin, urlparse
 
+# ============================================================
+# CONFIGURED SOURCES
+# ============================================================
 CONFIGURED_SOURCES = (
     ("Mabumbe", "https://mabumbe.com", "scrape_mabumbe"),
     ("Ajirayako", "https://ajirayako.co.tz", "scrape_ajirayako"),
-    ("Kaziconnect", "https://kaziconnect.co.tz", "scrape_kaziconnect"),
-    ("Dproz", "https://www.dproz.com", "scrape_dproz"),
+    ("Ajira Zote", "https://ajirazote.com", "scrape_ajira_zote"),
     ("BrighterMonday", "https://www.brightermonday.co.tz/jobs", "scrape_brightermonday"),
 )
+
 
 class JobScraper:
     def __init__(self, debug=False):
@@ -27,10 +30,10 @@ class JobScraper:
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
             'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
         ]
 
-        # Known companies in Tanzania for fallback
         self.known_companies = [
             'NMB Bank', 'Vodacom', 'CRDB Bank', 'Selcom', 'Huawei', 'Tigo', 'Airtel',
             'World Vision', 'Action Against Hunger', 'Marie Stopes', 'Bolt', 'Tembo Nickel',
@@ -40,10 +43,14 @@ class JobScraper:
             'KPMG', 'Deloitte', 'PwC', 'EY', 'Serengeti Breweries', 'Tanzania Breweries',
             'Bakhresa', 'Muhimbili Hospital', 'Aga Khan Hospital', 'Suma JKT', 'TANESCO',
             'NSSF', 'NHIF', 'TRA', 'TCCIA', 'TBS', 'TASAC', 'TCRA', 'EWURA',
-            'BBC', 'UN Women', 'IFC', 'World Economic Forum', 'CARE International'
+            'BBC', 'UN Women', 'IFC', 'World Economic Forum', 'CARE International',
+            'British High Commission', 'Thomson Safaris', 'Blue Recruits', 'Fortune House',
+            'Benter Group', 'NRG Media', 'DP World', 'Cartrack', 'Mango Tree',
+            'BRAC', 'Jhpiego', 'ActionAid', 'TadaHost', 'Realbiz',
         ]
 
         print("🤖 GRAFAN JOB SCRAPER READY (Keyword-based)")
+        print(f"   Sources: {len(CONFIGURED_SOURCES)}")
         print("   Using smart keyword matching for job detection")
 
     def log(self, message):
@@ -52,7 +59,6 @@ class JobScraper:
 
     @staticmethod
     def validate_public_http_url(value):
-        """Allow only public HTTP(S) hosts on standard ports."""
         candidate = value.strip()
         if not candidate:
             raise ValueError("A website URL is required.")
@@ -87,27 +93,60 @@ class JobScraper:
         return {
             'User-Agent': random.choice(self.user_agents),
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
+            'Accept-Language': 'en-US,en;q=0.9,sw;q=0.8',
             'Accept-Encoding': 'gzip, deflate',
             'Connection': 'keep-alive',
             'Upgrade-Insecure-Requests': '1',
+            'Cache-Control': 'max-age=0',
         }
 
     def is_job(self, text):
-        """Keep only text that names a role, rather than generic career pages."""
+        """Flexible job detection — accepts if role keyword OR job indicator found."""
         if not text:
             return False
         text = " ".join(text.split())
-        if len(text) > 180:
+        if len(text) > 250 or len(text) < 15:
             return False
         text_lower = text.lower()
+
+        # Exact matches to reject
+        rejected_exact = {
+            'jobs', 'job', 'recent jobs', 'promoted jobs', 'featured jobs',
+            'popular jobs', 'latest jobs', 'new jobs', 'all jobs',
+            'find jobs', 'browse jobs', 'search jobs', 'job search',
+            'home', 'about', 'contact', 'read more', 'view all',
+        }
+        if text_lower.strip() in rejected_exact:
+            return False
+
+        # Phrase exclusions — navigation, menus
         excluded_phrases = (
             'search jobs', 'post a job', 'job posting packages', 'useful links',
             'never pay to get a job', 'job vacancies page', 'latest careers & apply online',
             'connecting tanzania’s talent', "connecting tanzania's talent",
+            'privacy policy', 'terms of service', 'contact us', 'about us',
+            'log in', 'sign up', 'register', 'home page', 'read more',
+            'promoted jobs', 'recent jobs', 'featured jobs', 'popular jobs',
+            'jobs by category', 'jobs by location', 'browse jobs', 'all jobs',
+            'latest jobs', 'new jobs', 'job alerts', 'job search', 'find jobs',
+            'top jobs', 'best jobs', 'urgent jobs', 'hot jobs', 'trending jobs',
+            'career opportunities', 'digital recruitment',
+            'job categories', 'job types', 'job listings',
+            'view all jobs', 'see more jobs', 'more jobs', 'see all',
+            'subscribe', 'newsletter', 'copyright', 'all rights reserved',
         )
         if any(phrase in text_lower for phrase in excluded_phrases):
             return False
+
+        # Job indicators — kama text ina hizi, ni job
+        job_indicators = (
+            'job', 'vacancy', 'vacancies', 'position', 'opening',
+            'opportunity', 'opportunities', 'career', 'hiring',
+            'recruitment', 'kazi', 'nafasi', 'ajira', 'tender', 'internship',
+        )
+        has_indicator = any(ind in text_lower for ind in job_indicators)
+
+        # Role keywords — aina za kazi
         role_keywords = [
             'officer', 'manager', 'engineer', 'developer', 'specialist',
             'consultant', 'analyst', 'coordinator', 'supervisor', 'director',
@@ -116,14 +155,30 @@ class JobScraper:
             'administrator', 'recruiter', 'architect', 'designer', 'scientist',
             'researcher', 'auditor', 'driver', 'cashier', 'mechanic', 'lawyer',
             'advocate', 'lecturer', 'professor', 'chef', 'clerk', 'attendant',
-            'programmer', 'economist', 'agronomist', 'sales representative',
-            'customer service representative', 'fellow', 'volunteer'
+            'programmer', 'economist', 'agronomist', 'sales', 'representative',
+            'customer service', 'fellow', 'volunteer', 'adviser', 'advisor',
+            'head', 'chief', 'lead', 'leader', 'president', 'secretary',
+            'treasurer', 'bursar', 'librarian', 'counselor', 'therapist',
+            'pharmacist', 'dentist', 'veterinarian', 'pilot', 'captain',
+            'guard', 'security', 'cleaner', 'cook', 'waiter', 'waitress',
+            'receptionist', 'typist', 'data entry', 'ict',
+            'webmaster', 'full stack', 'frontend', 'backend', 'fullstack',
+            'devops', 'tester', 'business development', 'marketing',
+            'communications', 'public relations', 'logistics', 'procurement',
+            'supply chain', 'warehouse', 'store keeper', 'storekeeper',
+            'operations', 'quality', 'safety', 'environmental', 'social',
+            'community', 'field', 'project', 'program', 'grant', 'monitoring',
+            'evaluation', 'gis', 'remote sensing', 'hydrogeologist',
+            'geologist', 'geophysicist', 'surveyor', 'civil', 'electrical',
+            'mechanical', 'chemical', 'petroleum', 'mining', 'metallurgist',
+            'accounting', 'finance', 'hr', 'human resource', 'it support',
         ]
-        return any(re.search(r'\b' + re.escape(role) + r'\b', text_lower) for role in role_keywords)
+        has_role = any(re.search(r'\b' + re.escape(role) + r'\b', text_lower) for role in role_keywords)
+
+        return has_indicator or has_role
 
     @staticmethod
     def extract_source_url(node, current_url):
-        """Return an HTTP(S) link to the listing when the page exposes one."""
         link = node if getattr(node, "name", None) == "a" else node.find_parent("a", href=True)
         if not link:
             container = node.find_parent(["article", "li", "section", "div"])
@@ -176,70 +231,41 @@ class JobScraper:
         return match.group(1).strip(" -–:;.")[:2500] if match else None
 
     def extract_company(self, text):
-        """Extract company name from job title or description"""
+        """Extract company name from job title — patterns 3 tu."""
         if not text:
             return None
 
         text_clean = text.replace('\n', ' ').strip()
+        text_lower = text_clean.lower()
 
-        # Pattern 1: "at Company Name"
-        match = re.search(r'at\s+([A-Za-z0-9\s&\.\-]+?)(?:\s+-|\s+\(|$|\s+is|\s+in|\s+–|\s+\)|,|\s+for)', text_clean, re.IGNORECASE)
+        # Pattern 1: "at Company Name" — most reliable
+        match = re.search(
+            r'\bat\s+([A-Z][A-Za-z0-9\s&\.\-]{2,60}?)(?:\s+-|\s+\(|\s+is|\s+in|\s+–|\s+\)|,|\s+for|$)',
+            text_clean
+        )
         if match:
             company = match.group(1).strip()
-            if len(company) > 2 and len(company) < 60:
+            company = re.sub(r'\s+(Job|Vacancy|Position|Opportunity|Job Vacancy).*$', '', company, flags=re.IGNORECASE).strip()
+            if 2 < len(company) < 60:
                 return company
 
         # Pattern 2: "Company Name is hiring"
-        match = re.search(r'^([A-Za-z0-9\s&\.\-]+?)\s+(?:is hiring|announces|seeks|wants|looking for)', text_clean, re.IGNORECASE)
+        match = re.search(r'^([A-Z][A-Za-z0-9\s&\.\-]{2,60}?)\s+(?:is hiring|announces|seeks|wants|looking for)', text_clean)
         if match:
             company = match.group(1).strip()
-            if len(company) > 2 and len(company) < 60:
+            if 2 < len(company) < 60:
                 return company
 
-        # Pattern 3: "Job at Company Name"
-        match = re.search(r'job\s+at\s+([A-Za-z0-9\s&\.\-]+?)(?:\s+\(|$|\s+–)', text_clean, re.IGNORECASE)
-        if match:
-            company = match.group(1).strip()
-            if len(company) > 2 and len(company) < 60:
-                return company
-
-        # Pattern 4: "Company Name Vacancy"
-        match = re.search(r'^([A-Za-z0-9\s&\.\-]+?)\s+(?:Vacancy|Job|Opportunity|Announcement|Position)', text_clean, re.IGNORECASE)
-        if match:
-            company = match.group(1).strip()
-            if len(company) > 2 and len(company) < 60:
-                return company
-
-        # Pattern 5: "Company Name (job title)"
-        match = re.search(r'([A-Za-z0-9\s&\.\-]+?)\s*\([^)]*?(?:job|position|vacancy)', text_clean, re.IGNORECASE)
-        if match:
-            company = match.group(1).strip()
-            if len(company) > 2 and len(company) < 60:
-                return company
-
-        # Check known companies
+        # Pattern 3: Known companies — search all
         for company in self.known_companies:
-            if company.lower() in text_clean.lower():
+            if company.lower() in text_lower:
                 return company
-
-        # Check for common company prefixes
-        prefixes = ['at ', 'with ', 'for ', '@ ']
-        for prefix in prefixes:
-            if prefix in text_clean.lower():
-                start = text_clean.lower().find(prefix) + len(prefix)
-                end = text_clean.find(' ', start + 20) if start + 20 < len(text_clean) else len(text_clean)
-                if start < len(text_clean):
-                    company = text_clean[start:min(end, start+30)].strip()
-                    if len(company) > 2 and len(company) < 50:
-                        return company
 
         return None
 
     def classify_job_type(self, text):
-        """Classify job type based on keywords in text"""
         if not text:
             return None
-
         text_lower = text.lower()
         if any(kw in text_lower for kw in ['remote', 'work from home', 'wfh', 'work-from-home', 'remote work']):
             return 'remote'
@@ -252,50 +278,39 @@ class JobScraper:
         return None
 
     def extract_location(self, text):
-        """Extract location from text"""
         if not text:
             return None
-
         locations = [
             'Dar es Salaam', 'Arusha', 'Mwanza', 'Dodoma', 'Tanga', 'Mbeya', 'Zanzibar',
             'Kilimanjaro', 'Morogoro', 'Tabora', 'Kigoma', 'Singida', 'Rukwa', 'Mtwara',
             'Pwani', 'Coast', 'Iringa', 'Kagera', 'Lindi', 'Manyara', 'Mara', 'Njombe',
             'Ruvuma', 'Shinyanga', 'Simiyu', 'Geita', 'Katavi', 'Kaskazini', 'Kusini',
-            'Moshi', 'Bagamoyo', 'Mikumi'
+            'Moshi', 'Bagamoyo', 'Mikumi', 'Tanzania',
         ]
-
         text_lower = text.lower()
         for loc in locations:
             if loc.lower() in text_lower:
                 return loc
-
         return None
 
     def extract_salary(self, text):
-        """Extract salary information from text"""
         if not text:
             return None
-
         patterns = [
             r'(?:TSh|TZS|TSH|Tsh)\s*[\d,]+(?:[\s\-–]*[\d,]+)?',
             r'[\d,]+(?:[\s\-–]*[\d,]+)?\s*(?:TSh|TZS|TSH|Tsh)',
             r'(?:USD|US\$|USD\s*\$)\s*[\d,]+(?:[\s\-–]*[\d,]+)?',
             r'[\d,]+(?:[\s\-–]*[\d,]+)?\s*(?:USD|US\$)',
-            r'(?:TSh|TZS|TSH)\s*[\d,]+(?:[,\.]\d+)?'
         ]
-
         for pattern in patterns:
             match = re.search(pattern, text, re.IGNORECASE)
             if match:
                 return match.group(0)
-
         return None
 
     def scrape_any_url(self, url, source_name=None):
-        """Scrape job listings from one URL without inventing fallback listings."""
         jobs = []
         source = source_name or f"Scraped-{url[:40]}"
-
         url = self.validate_public_http_url(url)
 
         print(f"\n🔍 Scraping: {url}")
@@ -307,7 +322,21 @@ class JobScraper:
             response = None
             for redirect_count in range(4):
                 current_url = self.validate_public_http_url(current_url)
-                response = self.session.get(current_url, headers=self.get_headers(), timeout=20, allow_redirects=False)
+
+                # Retry logic kwa HTTP 500, 502, 503, 504
+                for attempt in range(3):
+                    response = self.session.get(
+                        current_url,
+                        headers=self.get_headers(),
+                        timeout=20,
+                        allow_redirects=False
+                    )
+                    if response.status_code in {500, 502, 503, 504} and attempt < 2:
+                        print(f"   ⚠️ HTTP {response.status_code}, retrying ({attempt + 1}/3)...")
+                        time.sleep(2)
+                        continue
+                    break
+
                 print(f"   📡 HTTP Status: {response.status_code}")
                 if response.status_code not in {301, 302, 303, 307, 308}:
                     break
@@ -326,17 +355,15 @@ class JobScraper:
 
             soup = BeautifulSoup(response.text, 'html.parser')
 
-            # Remove noise
             for tag in soup(["script", "style", "nav", "footer", "header", "iframe", "form"]):
                 tag.decompose()
 
             found_jobs = {}
 
-            # Method 1: Look at headings
             print(f"   🔍 Searching for job headings...")
             for heading in soup.find_all(['h1', 'h2', 'h3', 'h4']):
                 text = heading.get_text(" ", strip=True)
-                if text and 15 < len(text) < 300 and self.is_job(text):
+                if text and 15 < len(text) < 250 and self.is_job(text):
                     if text not in found_jobs:
                         found_jobs[text] = {
                             'title': text[:250],
@@ -349,13 +376,11 @@ class JobScraper:
                             'application_url': self.extract_application_url(heading, current_url),
                             'recruiter_email': self.extract_email(heading)
                         }
-                        self.log(f"Found job in heading: {text[:50]}...")
 
-            # Method 2: Look at links with job text
             print(f"   🔍 Searching for job links...")
             for link in soup.find_all('a'):
                 text = link.get_text(" ", strip=True)
-                if text and 15 < len(text) < 300 and self.is_job(text):
+                if text and 15 < len(text) < 250 and self.is_job(text):
                     if text not in found_jobs:
                         found_jobs[text] = {
                             'title': text[:250],
@@ -368,7 +393,6 @@ class JobScraper:
                             'application_url': self.extract_application_url(link, current_url),
                             'recruiter_email': self.extract_email(link)
                         }
-                        self.log(f"Found job link: {text[:50]}...")
 
             print(f"   📊 Found {len(found_jobs)} potential jobs")
 
@@ -376,10 +400,8 @@ class JobScraper:
                 print(f"   ⚠️ No job listings found")
                 return []
 
-            # Convert to job objects with unique key
             seen_titles = set()
-            for key, job_data in list(found_jobs.items())[:50]:
-                # Remove common prefixes/suffixes
+            for key, job_data in list(found_jobs.items())[:100]:
                 title = job_data['title']
                 title = re.sub(r'^(?:Apply|View|Read\s+More|Click\s+Here)\s*[:|]?\s*', '', title, flags=re.IGNORECASE)
                 title = title.strip()
@@ -393,7 +415,7 @@ class JobScraper:
                 application_instructions = self.extract_labeled_section(context, ['how to apply', 'application instructions', 'application process'])
                 application_deadline = self.extract_labeled_section(context, ['application deadline', 'closing date', 'deadline'])
 
-                if title not in seen_titles:
+                if title not in seen_titles and len(title) >= 15:
                     seen_titles.add(title)
                     jobs.append({
                         'title': title,
@@ -434,58 +456,41 @@ class JobScraper:
     # ============ SCRAPE FUNCTIONS ============
 
     def scrape_mabumbe(self):
-        print("\n" + "=" * 50)
-        print("📌 SCRAPING: Mabumbe")
-        print("=" * 50)
         return self.scrape_any_url('https://mabumbe.com', 'Mabumbe')
 
     def scrape_ajirayako(self):
-        print("\n" + "=" * 50)
-        print("📌 SCRAPING: Ajirayako")
-        print("=" * 50)
         return self.scrape_any_url('https://ajirayako.co.tz', 'Ajirayako')
 
-    def scrape_kaziconnect(self):
-        print("\n" + "=" * 50)
-        print("📌 SCRAPING: Kaziconnect")
-        print("=" * 50)
-        return self.scrape_any_url('https://kaziconnect.co.tz', 'Kaziconnect')
-
-    def scrape_dproz(self):
-        print("\n" + "=" * 50)
-        print("📌 SCRAPING: Dproz")
-        print("=" * 50)
-        return self.scrape_any_url('https://www.dproz.com', 'Dproz')
+    def scrape_ajira_zote(self):
+        return self.scrape_any_url('https://ajirazote.com', 'Ajira Zote')
 
     def scrape_brightermonday(self):
-        print("\n" + "=" * 50)
-        print("📌 SCRAPING: BrighterMonday")
-        print("=" * 50)
         return self.scrape_any_url('https://www.brightermonday.co.tz/jobs', 'BrighterMonday')
 
     def scrape_custom_url(self, url):
         return self.scrape_any_url(url, 'Custom')
-
-    def get_ajira_portal(self):
-        return self.scrape_any_url('https://portal.ajira.go.tz', 'Ajira Portal')
 
     def scrape_all_sources(self):
         print("\n" + "=" * 60)
         print("📌 GRAFAN JOB SCRAPER (Keyword-based)")
         print("=" * 60)
         print(f"⏰ Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"📋 Sources: {len(CONFIGURED_SOURCES)}")
         print("=" * 60)
 
         all_jobs = []
         self.last_errors = []
 
-        # Attempt each configured source independently so one blocked site does not
-        # prevent successful listings from other sources being returned.
         print("\n📢 SCRAPING CONFIGURED SOURCES...")
         for source_name, _url, method_name in CONFIGURED_SOURCES:
-            scrape = getattr(self, method_name)
+            scrape = getattr(self, method_name, None)
+            if not scrape:
+                print(f"⚠️ {source_name}: method {method_name} not found")
+                continue
             try:
-                all_jobs.extend(scrape())
+                result = scrape()
+                all_jobs.extend(result)
+                print(f"✅ {source_name}: {len(result)} jobs")
             except Exception as e:
                 message = str(e)
                 http_status = re.search(r"HTTP (\d{3})", message)
@@ -498,10 +503,9 @@ class JobScraper:
                 else:
                     reason = "The source could not be read."
                 self.last_errors.append({"source": source_name, "error": reason})
-                print(f"❌ {source_name} failed: {reason}")
-            time.sleep(2)
+                print(f"❌ {source_name}: {reason}")
+            time.sleep(1)
 
-        # Remove duplicates based on title and company
         seen = set()
         unique_jobs = []
         for job in all_jobs:
@@ -514,7 +518,6 @@ class JobScraper:
         print("📊 SCRAPING SUMMARY")
         print("=" * 60)
 
-        # Count jobs by source
         sources_count = {}
         for job in unique_jobs:
             src = job.get('source', 'Unknown')
