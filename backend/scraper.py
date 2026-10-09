@@ -24,7 +24,7 @@ CONFIGURED_SOURCES = (
 
 class JobScraper:
     def __init__(self, debug=False):
-        # ✅ Cloudscraper inashinda Cloudflare
+        # Cloudscraper inashinda Cloudflare
         self.session = cloudscraper.create_scraper(
             browser={
                 'browser': 'chrome',
@@ -62,6 +62,7 @@ class JobScraper:
         print(f"   Sources: {len(CONFIGURED_SOURCES)}")
         print("   Using smart keyword matching for job detection")
         print("   Cloudscraper: ENABLED")
+        print("   Timeout: 45s | Retries: 3")
 
     def log(self, message):
         if self.debug:
@@ -333,14 +334,22 @@ class JobScraper:
             for redirect_count in range(4):
                 current_url = self.validate_public_http_url(current_url)
 
-                # Retry logic kwa HTTP 500, 502, 503, 504
+                # Retry logic kwa HTTP 500-504 NA timeout
                 for attempt in range(3):
-                    response = self.session.get(
-                        current_url,
-                        headers=self.get_headers(),
-                        timeout=20,
-                        allow_redirects=False
-                    )
+                    try:
+                        response = self.session.get(
+                            current_url,
+                            headers=self.get_headers(),
+                            timeout=45,
+                            allow_redirects=False
+                        )
+                    except requests.exceptions.Timeout:
+                        if attempt < 2:
+                            print(f"   ⚠️ Timeout, retrying ({attempt + 1}/3)...")
+                            time.sleep(3)
+                            continue
+                        raise
+
                     if response.status_code in {500, 502, 503, 504} and attempt < 2:
                         print(f"   ⚠️ HTTP {response.status_code}, retrying ({attempt + 1}/3)...")
                         time.sleep(2)
@@ -454,7 +463,7 @@ class JobScraper:
             return jobs
 
         except requests.exceptions.Timeout:
-            raise RuntimeError("The website did not respond within 20 seconds.")
+            raise RuntimeError("The website did not respond within 45 seconds.")
         except requests.exceptions.ConnectionError as e:
             raise RuntimeError(f"Could not connect to the website: {e}") from e
         except Exception as e:
@@ -504,7 +513,7 @@ class JobScraper:
             except Exception as e:
                 message = str(e)
                 http_status = re.search(r"HTTP (\d{3})", message)
-                if "within 20 seconds" in message.lower() or isinstance(e, requests.exceptions.Timeout):
+                if "within 45 seconds" in message.lower() or isinstance(e, requests.exceptions.Timeout):
                     reason = "The source timed out."
                 elif http_status:
                     reason = f"The source returned HTTP {http_status.group(1)}."
