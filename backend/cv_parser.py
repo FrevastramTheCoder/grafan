@@ -1,30 +1,32 @@
 import pdfplumber
 import re
-import os
 
 class CVParser:
     def parse_pdf(self, file_path):
         """Extract text from PDF"""
         text = ""
         try:
-            print(f"📄 Parsing PDF: {file_path}")
-            print(f"📄 File size: {os.path.getsize(file_path)} bytes")
-            
             with pdfplumber.open(file_path) as pdf:
-                print(f"📄 Number of pages: {len(pdf.pages)}")
                 for i, page in enumerate(pdf.pages):
                     page_text = page.extract_text() or ""
                     text += page_text + "\n"
-                    print(f"📄 Page {i+1}: {len(page_text)} characters")
-            
-            print(f"📄 Total extracted text: {len(text)} characters")
-            print(f"📄 First 200 chars: {text[:200]}")
+            print(f"📄 Parsed PDF with {len(pdf.pages)} page(s), extracted {len(text)} characters.")
             
         except Exception as e:
-            print(f"❌ PDF parsing error: {e}")
-            import traceback
-            traceback.print_exc()
+            print(f"CV PDF parsing failed ({type(e).__name__}).")
         
+        return text
+
+    def parse_docx(self, file_path):
+        """Extract selectable text from a DOCX without logging its contents."""
+        from docx import Document
+        document = Document(file_path)
+        parts = [paragraph.text for paragraph in document.paragraphs if paragraph.text.strip()]
+        for table in document.tables:
+            for row in table.rows:
+                parts.append(" | ".join(cell.text.strip() for cell in row.cells if cell.text.strip()))
+        text = "\n".join(parts)
+        print(f"Parsed DOCX, extracted {len(text)} characters.")
         return text
     
     def extract_info(self, text):
@@ -38,8 +40,6 @@ class CVParser:
             'education': self.extract_education(text)
         }
         
-        print(f"📊 Extracted: Name={info['name']}, Email={info['email']}, Phone={info['phone']}")
-        
         return info
     
     def extract_name(self, text):
@@ -50,7 +50,6 @@ class CVParser:
         if pattern1:
             name = pattern1.group(1).strip()
             if name and len(name) > 2:
-                print(f"✅ Name found via 'Name:' pattern: {name}")
                 return name
         
         # Pattern 2: Look for "CURRICULUM VITAE" followed by name on next line
@@ -58,7 +57,6 @@ class CVParser:
         if pattern2:
             name = pattern2.group(1).strip()
             if name and len(name) > 2:
-                print(f"✅ Name found via 'CURRICULUM VITAE' pattern: {name}")
                 return name
         
         # Pattern 3: Look for name on first few lines that looks like a person's name
@@ -78,7 +76,6 @@ class CVParser:
                 # Check if it has at least two parts (first and last name)
                 parts = line.split()
                 if len(parts) >= 2:
-                    print(f"✅ Name found via line detection: {line}")
                     return line
         
         # Pattern 4: Look for name anywhere in the document with common name prefixes
@@ -86,10 +83,8 @@ class CVParser:
         if pattern4:
             name = pattern4.group(1).strip()
             if name and len(name) > 2:
-                print(f"✅ Name found via prefix pattern: {name}")
                 return name
         
-        print("⚠️ No name detected in CV")
         return "Not detected"
     
     def extract_email(self, text):
@@ -124,7 +119,8 @@ class CVParser:
         found = []
         text_lower = text.lower()
         for skill in skills_keywords:
-            if skill in text_lower and skill not in found:
+            pattern = r"(?<![a-z0-9])" + re.escape(skill) + r"(?![a-z0-9])"
+            if re.search(pattern, text_lower) and skill not in found:
                 found.append(skill)
         return found[:15]  # Return top 15 skills
     

@@ -1,9 +1,55 @@
-node_modules/
+# Environment
 .env
-.DS_Store
-backend/venv/
-backend/uploads/
-*.pyc
+.env.local
+.env.*.local
+
+# Python
 __pycache__/
-.netlify/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+ENV/
+backend/venv/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+backend/instance/
+backend/grafan.db
+
+# Uploads
+backend/uploads/
+backend/uploads/cvs/
+
+# Audit runtime
+_audit_runtime*/
+*.backup-*
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build
 build/
+frontend/build/
+dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backup files
+*.backup
+*.old
+*~
