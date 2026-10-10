@@ -977,6 +977,8 @@ def is_displayable_job(job):
             "manual entry",
             "direct post",
             "employer post",
+            "public post",
+            "custom",
             "grafan",
         }
         or not source
