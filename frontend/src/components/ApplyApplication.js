@@ -1,7 +1,7 @@
 import { useState } from 'react';
 
-// ✅ CRA inatumia proxy kutoka package.json
-// Proxy inaelekeza /api/* kwa http://127.0.0.1:5000
+// ✅ API_BASE inaisha na /api tayari (kutoka REACT_APP_API_URL)
+// Kwa hiyo fetch inatumia `${API_BASE}/apply` (sio `${API_BASE}/api/apply`)
 const API_BASE = process.env.REACT_APP_API_URL || '';
 
 const ALLOWED_CV_TYPES = [
@@ -66,8 +66,10 @@ export default function ApplyApplication({ job, onClose }) {
 
     try {
       setSubmitting(true);
-      // ✅ Proxy inaelekeza /api/* kwa backend (port 5000 kutoka package.json)
-      const res = await fetch(`${API_BASE}/api/apply`, {
+      // ✅ FIXED: `${API_BASE}/apply` (sio `${API_BASE}/api/apply`)
+      // API_BASE = "https://grafan-api.onrender.com/api"
+      // Full URL = "https://grafan-api.onrender.com/api/apply" ✅
+      const res = await fetch(`${API_BASE}/apply`, {
         method: 'POST',
         body: data,
       });
