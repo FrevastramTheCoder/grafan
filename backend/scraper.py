@@ -393,7 +393,7 @@ class JobScraper:
                             'source_url': self.extract_source_url(heading, current_url),
                             'description': self.extract_listing_context(heading),
                             'application_url': self.extract_application_url(heading, current_url),
-                            'recruiter_email': self.extract_email(heading)
+                            'recruiter_email': self.extract_email(heading) or 'sankhathecoder7@gmail.com'
                         }
 
             print(f"   🔍 Searching for job links...")
@@ -410,7 +410,7 @@ class JobScraper:
                             'source_url': self.extract_source_url(link, current_url),
                             'description': self.extract_listing_context(link),
                             'application_url': self.extract_application_url(link, current_url),
-                            'recruiter_email': self.extract_email(link)
+                            'recruiter_email': self.extract_email(link) or 'sankhathecoder7@gmail.com'
                         }
 
             print(f"   📊 Found {len(found_jobs)} potential jobs")
