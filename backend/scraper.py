@@ -387,7 +387,7 @@ class JobScraper:
                         found_jobs[text] = {
                             'title': text[:250],
                             'company': self.extract_company(text),
-                            'job_type': self.classify_job_type(text),
+                            'job_type': self.classify_job_type(text) or 'onsite',
                             'location': self.extract_location(text),
                             'salary': self.extract_salary(text),
                             'source_url': self.extract_source_url(heading, current_url),
@@ -404,7 +404,7 @@ class JobScraper:
                         found_jobs[text] = {
                             'title': text[:250],
                             'company': self.extract_company(text),
-                            'job_type': self.classify_job_type(text),
+                            'job_type': self.classify_job_type(text) or 'onsite',
                             'location': self.extract_location(text),
                             'salary': self.extract_salary(text),
                             'source_url': self.extract_source_url(link, current_url),

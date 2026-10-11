@@ -32,7 +32,7 @@ export default function JobCard({
           <p className="company-name">{job.company || 'Employer not listed'}</p>
         </div>
         <span className={`work-badge work-${job.job_type || 'unknown'}`}>
-          {workModes[job.job_type] || 'Work type not listed'}
+          {workModes[job.job_type] || 'On-site'}
         </span>
       </div>
 
