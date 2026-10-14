@@ -87,9 +87,15 @@ engine_options = (
     else {}
 )
 
+# SSL kwa PostgreSQL (Neon/Supabase)
+if DATABASE_URL.startswith("postgresql"):
+    if "sslmode" not in DATABASE_URL:
+        DATABASE_URL += "?sslmode=require"
+
 engine = create_engine(
     DATABASE_URL,
-    **engine_options
+    **engine_options,
+    pool_pre_ping=True,
 )
 
 SessionLocal = sessionmaker(
